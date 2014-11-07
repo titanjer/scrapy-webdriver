@@ -22,6 +22,7 @@ class WebdriverDownloadHandler(object):
     def __init__(self, settings):
         self._enabled = settings.get('WEBDRIVER_BROWSER') is not None
         self._fallback_handler = load_object(FALLBACK_HANDLER)(settings)
+        self._retry_times = int(settings.get('RETRY_TIMES'))
 
     def download_request(self, request, spider):
         """Return the result of the right download method for the request."""
@@ -37,8 +38,22 @@ class WebdriverDownloadHandler(object):
     @inthread
     def _download_request(self, request, spider):
         """Download a request URL using webdriver."""
-        log.msg('Downloading %s with webdriver' % request.url, level=log.DEBUG)
-        request.manager.webdriver.get(request.url)
+        counter = self._retry_times
+        while counter != 0:
+            counter -= 1
+            try:
+                log.msg('Downloading %s with webdriver #%d' % (
+                        request.url,
+                        self._retry_times - counter),
+                        level=log.DEBUG)
+                request.manager.webdriver.get(request.url)
+                break
+            except:
+                pass
+
+            if counter == 0:
+                log.msg('Downloading %s with webdriver Error!' % request.url)
+
         return WebdriverResponse(request.url, request.manager.webdriver)
 
     @inthread
